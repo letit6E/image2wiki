@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-width=1.0">
+    <title>Найди себя в Википедии</title>
+    <link rel="icon" href="https://ru.wikipedia.org/static/favicon/wikipedia.ico">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Lato, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            color: #202122;
+        }
+        .container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            max-width: 500px;
+            width: 90%;
+        }
+        .logo {
+            width: 150px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+            font-weight: normal;
+        }
+        .subtitle {
+            color: #72777d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .upload-area {
+            border: 2px dashed #a2a9b1;
+            border-radius: 8px;
+            padding: 40px 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-bottom: 20px;
+            position: relative;
+        }
+        .upload-area:hover {
+            background: #f8f9fa;
+        }
+        .upload-area input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+        .upload-icon {
+            font-size: 40px;
+            color: #36c;
+            margin-bottom: 10px;
+        }
+        .btn-submit {
+            background-color: #36c;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.3s;
+            width: 100%;
+        }
+        .btn-submit:hover {
+            background-color: #2a4b8d;
+        }
+        .btn-submit:disabled {
+            background-color: #a2a9b1;
+            cursor: not-allowed;
+        }
+        .note {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #d33;
+            font-weight: bold;
+        }
+        .disclaimer {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 11px;
+            color: #a2a9b1;
+            max-width: 250px;
+            text-align: right;
+        }
+        #preview {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 15px;
+            display: none;
+            border-radius: 4px;
+        }
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 1000;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #36c;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .loading-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: #202122;
+            margin-bottom: 10px;
+        }
+        .loading-subtext {
+            color: #72777d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <img src="https://ru.wikipedia.org/static/images/icons/wikipedia.png" alt="Wikipedia" class="logo">
+        <h1>Найди себя в Википедии</h1>
+        <div class="subtitle">Загрузите фотографию, чтобы узнать, что о вас написано в свободной энциклопедии</div>
+
+        <form id="uploadForm" action="/generate" method="post" enctype="multipart/form-data">
+            <div class="upload-area" id="dropZone">
+                <div class="upload-icon">📷</div>
+                <div id="uploadText">Нажмите или перетащите фото сюда</div>
+                <input type="file" name="image" id="imageInput" accept="image/*" required>
+                <img id="preview" alt="Предпросмотр">
+            </div>
+            
+            <button type="submit" class="btn-submit" id="submitBtn" disabled>Найти статью</button>
+            
+            <div class="note">
+                ⚠️ Внимание: создание статьи занимает около 3 минут. Пожалуйста, не закрывайте страницу.
+            </div>
+        </form>
+    </div>
+
+    <div class="disclaimer">
+        * Данный инструмент не ищет реальные статьи на Википедии, а генерирует шуточные статьи с помощью нейросети на основе загруженной фотографии.
+    </div>
+
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Нейросеть пишет статью...</div>
+        <div class="loading-subtext">Это займет около 3 минут. Пожалуйста, подождите.</div>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const preview = document.getElementById('preview');
+        const uploadText = document.getElementById('uploadText');
+        const submitBtn = document.getElementById('submitBtn');
+        const uploadForm = document.getElementById('uploadForm');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        imageInput.addEventListener('change', function() {
+            if (this.files && this.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    uploadText.style.display = 'none';
+                    submitBtn.disabled = false;
+                }
+                reader.readAsDataURL(this.files[0]);
+            } else {
+                preview.style.display = 'none';
+                uploadText.style.display = 'block';
+                submitBtn.disabled = true;
+            }
+        });
+
+        uploadForm.addEventListener('submit', function() {
+            loadingOverlay.style.display = 'flex';
+        });
+    </script>
+</body>
+</html>
